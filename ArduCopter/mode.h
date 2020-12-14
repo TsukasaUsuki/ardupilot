@@ -1611,7 +1611,11 @@ public:
         Submode_FlipStart = 2, 
         Submode_FlipRoll = 3, 
         Submode_FlipRecover = 4, 
-        Submode_AcroEnd = 5
+        Submode_FlipStartPitch = 5,
+        Submode_FlipPitchA = 6,
+        Submode_FlipPitchB = 7,
+        Submode_FlipRecoverPitch = 8,
+        Submode_AcroEnd = 9
     };
 
 protected:

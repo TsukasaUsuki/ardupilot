@@ -273,7 +273,7 @@ void ModeSpiralAcro::acro_run()
             }
             break;
         case Submode_FlipStart:
-            // under 45 degrees request 400deg/sec roll or pitch
+            // under 45 degrees request 400deg/sec roll
             attitude_control->input_rate_bf_roll_pitch_yaw(FLIP_ROTATION_RATE * FLIP_ROLL_RIGHT, FLIP_ROTATION_RATE * FLIP_PITCH_BACK, 0.0);
 
             // increase throttle
@@ -305,6 +305,56 @@ void ModeSpiralAcro::acro_run()
             float recovery_angle;
             // we are rolling
             recovery_angle = fabsf(orig_attitude.x - (float)ahrs.roll_sensor);
+
+            // check for successful recovery
+            if (fabsf(recovery_angle) <= FLIP_RECOVERY_ANGLE) {
+                _state_submode = Submode_FlipStartPitch;                
+            }
+            break;
+        case Submode_FlipStartPitch:
+            flip_angle = ahrs.pitch_sensor * FLIP_PITCH_BACK;
+            // under 45 degrees request 400deg/sec pitch
+            attitude_control->input_rate_bf_roll_pitch_yaw(FLIP_ROTATION_RATE * FLIP_ROLL_RIGHT, FLIP_ROTATION_RATE * FLIP_PITCH_BACK, 0.0);
+
+            // increase throttle
+            throttle_out += FLIP_THR_INC;
+
+            // beyond 45deg lean angle move to next stage
+            if (flip_angle >= 4500) {
+                _state_submode = Submode_FlipPitchA;
+            }
+            break;
+        case Submode_FlipPitchA:
+            // between 45deg ~ -90deg request 400deg/sec pitch
+            attitude_control->input_rate_bf_roll_pitch_yaw(0.0f, FLIP_ROTATION_RATE * FLIP_PITCH_BACK, 0.0);
+            // decrease throttle
+            throttle_out = MAX(throttle_out - FLIP_THR_DEC, 0.0f);
+
+            // check roll for inversion
+            if ((labs(ahrs.roll_sensor) > 9000) && (flip_angle > 4500)) {
+                _state_submode = Submode_FlipPitchB;
+            }
+            break;
+        case Submode_FlipPitchB:
+            // between 45deg ~ -90deg request 400deg/sec pitch
+            attitude_control->input_rate_bf_roll_pitch_yaw(0.0, FLIP_ROTATION_RATE * FLIP_PITCH_BACK, 0.0);
+            // decrease throttle
+            throttle_out = MAX(throttle_out - FLIP_THR_DEC, 0.0f);
+
+            // check roll for inversion
+            if ((labs(ahrs.roll_sensor) < 9000) && (flip_angle > -4500)) {
+                _state_submode = Submode_FlipRecoverPitch;
+            }
+            break;
+        case Submode_FlipRecoverPitch:
+            // use originally captured earth-frame angle targets to recover
+            attitude_control->input_euler_angle_roll_pitch_yaw(orig_attitude.x, orig_attitude.y, orig_attitude.z, false);
+
+            // increase throttle to gain any lost altitude
+            throttle_out += FLIP_THR_INC;
+
+            // we are pitching
+            recovery_angle = fabsf(orig_attitude.y - (float)ahrs.pitch_sensor);
 
             // check for successful recovery
             if (fabsf(recovery_angle) <= FLIP_RECOVERY_ANGLE) {
